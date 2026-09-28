@@ -39,6 +39,9 @@ UI = material("Gameplay_UI", (.3,.9,1), (.1,.7,1), 8)
 
 # Constants.
 SPEED = 6.5
+DASH_SPEED = 15.0
+DASH_DURATION = 0.16
+DASH_COOLDOWN = 1.2
 ABILITY_RANGE = 2.25
 ABILITY_COOLDOWN = .65
 MAX_HP = 5
@@ -50,7 +53,7 @@ STAGE_LAYOUTS = {1:[(-1.5,2.5,0),(-.5,-3,0),(2.3,-1.3,0)],2:[(-2.5,3.5,0),(1,3,0
 
 state = {
     "hp": MAX_HP, "crystals": 0, "stage": 1, "alive": True, "won": False, "transition": False, "transition_until": 0.0,
-    "last_attack": -99.0, "invuln": 0.0, "keys": set(),
+    "last_attack": -99.0, "last_dash": -99.0, "dash_until": 0.0, "dash_dir": Vector((0,0,0)), "invuln": 0.0, "keys": set(),
     "enemies": [], "drops": [], "pulse": None
 }
 
@@ -164,6 +167,21 @@ def attack(now):
         if dist(hero,enemy) <= ABILITY_RANGE:
             kill_enemy(enemy)
 
+def dash(now):
+    if not state["alive"] or state["won"] or state["transition"] or now-state["last_dash"] < DASH_COOLDOWN:
+        return
+    d=Vector((0,0,0))
+    if "UP" in state["keys"]: d.y+=1
+    if "DOWN" in state["keys"]: d.y-=1
+    if "LEFT" in state["keys"]: d.x-=1
+    if "RIGHT" in state["keys"]: d.x+=1
+    if not d.length:
+        d=Vector((1,0,0))
+    state["dash_dir"]=d.normalized()
+    state["last_dash"]=now
+    state["dash_until"]=now+DASH_DURATION
+    state["invuln"]=max(state["invuln"],state["dash_until"])
+
 def damage(now):
     if now < state["invuln"]:
         return
@@ -246,6 +264,8 @@ class STARFALL_OT_PLAY(bpy.types.Operator):
             elif event.value=="RELEASE": state["keys"].discard(k)
         if event.type=="SPACE" and event.value=="PRESS":
             attack(now)
+        if event.type=="LEFT_SHIFT" and event.value=="PRESS":
+            dash(now)
         if event.type=="R" and event.value=="PRESS" and (not state["alive"] or state["won"]):
             reset()
 
@@ -266,6 +286,8 @@ class STARFALL_OT_PLAY(bpy.types.Operator):
                 if "LEFT" in state["keys"]: d.x-=1
                 if "RIGHT" in state["keys"]: d.x+=1
                 if d.length: hero.location += d.normalized()*SPEED*dt
+                if now < state["dash_until"]:
+                    hero.location += state["dash_dir"]*DASH_SPEED*dt
                 hero.location.x=max(BOUNDS[0],min(BOUNDS[1],hero.location.x))
                 hero.location.y=max(BOUNDS[2],min(BOUNDS[3],hero.location.y))
 
@@ -323,6 +345,7 @@ except Exception as exc:
 print("=== STARFALL DASH PLAYABLE PROTOTYPE ===")
 print("WASD / Arrows = move")
 print("SPACE = close-range attack")
+print("LEFT SHIFT = dash / brief invulnerability")
 print("Kill enemies -> collect their dropped crystals")
 print("3 crystals per stage; 3 stages = WIN")
 print("Enemy contact = damage")
