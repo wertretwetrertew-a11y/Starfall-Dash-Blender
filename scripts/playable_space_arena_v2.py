@@ -62,7 +62,8 @@ STAGE_LAYOUTS = {1:[(-1.5,2.5,0),(-.5,-3,0),(2.3,-1.3,0)],2:[(-2.5,3.5,0),(1,3,0
 state = {
     "hp": MAX_HP, "crystals": 0, "stage": 1, "alive": True, "won": False, "transition": False, "transition_until": 0.0,
     "last_attack": -99.0, "last_dash": -99.0, "dash_until": 0.0, "dash_dir": Vector((0,0,0)), "invuln": 0.0, "keys": set(),
-    "enemies": [], "drops": [], "pulse": None, "boss": None, "boss_hp": BOSS_HP, "boss_last_attack": -99.0, "boss_active": False, "boss_phase": 1, "message_until": 0.0
+    "enemies": [], "drops": [], "pulse": None, "boss": None, "boss_hp": BOSS_HP, "boss_last_attack": -99.0, "boss_active": False, "boss_phase": 1, "message_until": 0.0,
+    "damage_flash_until": 0.0, "dash_trail_until": 0.0, "boss_phase_notice": False
 }
 
 # Remove decorative center crystal from the cinematic scene.
@@ -222,8 +223,10 @@ def damage_boss():
     if not state["boss_active"] or not boss or boss.hide_viewport:
         return
     state["boss_hp"]-=1
-    if state["boss_hp"] <= BOSS_HP // 2:
+    if state["boss_hp"] <= BOSS_HP // 2 and state["boss_phase"] == 1:
         state["boss_phase"]=2
+        state["boss_phase_notice"]=True
+        message("STAR EATER — PHASE II", 1.4)
     boss.scale=(1.75,1.75,1.75)
     boss["hit_until"]=time.monotonic()+.12
     boss["base_scale"]=1.55
@@ -286,6 +289,13 @@ def dash(now):
     state["dash_dir"]=d.normalized()
     state["last_dash"]=now
     state["dash_until"]=now+DASH_DURATION
+    state["dash_trail_until"]=now+.22
+    bpy.ops.mesh.primitive_cube_add(size=1, location=hero.location)
+    trail=bpy.context.object
+    trail.name="ABILITY_DASH_TRAIL"
+    trail.scale=hero.scale*1.08
+    trail.data.materials.append(PULSE)
+    trail["created"]=now
     state["invuln"]=max(state["invuln"],state["dash_until"])
 
 def damage(now):
@@ -293,6 +303,7 @@ def damage(now):
         return
     state["hp"]-=1
     state["invuln"]=now+DAMAGE_COOLDOWN
+    state["damage_flash_until"]=now+.18
     update_hud()
     if state["hp"]<=0:
         state["alive"]=False
@@ -327,7 +338,8 @@ def reset():
             bpy.data.objects.remove(o,do_unlink=True)
     state.update({"hp":MAX_HP,"crystals":0,"stage":1,"alive":True,"won":False,"transition":False,"transition_until":0.0,
                   "last_attack":-99.0,"last_dash":-99.0,"dash_until":0.0,"dash_dir":Vector((0,0,0)),"invuln":0.0,"keys":set(),
-                  "enemies":[],"drops":[],"pulse":None,"boss":None,"boss_hp":BOSS_HP,"boss_last_attack":-99.0,"boss_active":False,"boss_phase":1,"message_until":0.0})
+                  "enemies":[],"drops":[],"pulse":None,"boss":None,"boss_hp":BOSS_HP,"boss_last_attack":-99.0,"boss_active":False,"boss_phase":1,"message_until":0.0,
+                  "damage_flash_until":0.0,"dash_trail_until":0.0,"boss_phase_notice":False})
     hero.location=(-5.2,0,0)
     hero.hide_viewport=False
     hero.hide_render=False
@@ -455,6 +467,19 @@ class STARFALL_OT_PLAY(bpy.types.Operator):
             if msg and state["message_until"] and now >= state["message_until"] and state["alive"] and not state["won"]:
                 bpy.data.objects.remove(msg,do_unlink=True)
                 state["message_until"]=0.0
+
+            trail=bpy.data.objects.get("ABILITY_DASH_TRAIL")
+            if trail and trail.name in scene.objects:
+                age=now-trail["created"]
+                trail.location=hero.location-state["dash_dir"]*.38
+                trail.scale=hero.scale*(1.08+max(0,.22-age)*1.6)
+                if age>.22:
+                    bpy.data.objects.remove(trail,do_unlink=True)
+
+            if now < state["damage_flash_until"]:
+                hero.scale=(1.12,1.12,1.12)
+            else:
+                hero.scale=(1,1,1)
 
             pulse=state["pulse"]
             if pulse and pulse.name in scene.objects:
