@@ -12,6 +12,11 @@ if not hero:
 
 # Stop cinematic animation.
 hero.animation_data_clear()
+# Keep the inner core attached to the cube at the correct local position.
+core = bpy.data.objects.get("Player_Core")
+if core:
+    core.parent = hero
+    core.location = (0, 0, 0)
 
 # Clean previous gameplay objects.
 for o in list(scene.objects):
