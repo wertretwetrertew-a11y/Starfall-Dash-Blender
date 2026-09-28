@@ -36,6 +36,8 @@ def material(name, color, emission, strength):
 CRYSTAL = material("Gameplay_Crystal", (.03,.8,1), (.02,.8,1), 14)
 PULSE = material("Gameplay_Pulse", (.1,.5,1), (.05,.5,1), 12)
 UI = material("Gameplay_UI", (.3,.9,1), (.1,.7,1), 8)
+BOSS = material("Gameplay_Boss", (.55,.08,1), (.7,.03,1), 18)
+BOSS_AURA = material("Gameplay_Boss_Aura", (.15,.02,.35), (.4,.02,1), 10)
 
 # Constants.
 SPEED = 6.5
@@ -48,13 +50,17 @@ MAX_HP = 5
 DAMAGE_COOLDOWN = 1.0
 CRYSTALS_PER_STAGE = 3
 STAGES = 3
+BOSS_HP = 10
+BOSS_SPEED = 1.35
+BOSS_CONTACT_RANGE = 1.35
+BOSS_ATTACK_COOLDOWN = 1.15
 BOUNDS = (-8, 8, -5.5, 5.5)
 STAGE_LAYOUTS = {1:[(-1.5,2.5,0),(-.5,-3,0),(2.3,-1.3,0)],2:[(-2.5,3.5,0),(1,3,0),(3.5,-2.5,0),(-3.5,-2,0)],3:[(-5.5,4.2,0),(-1.8,4.5,0),(2,4.3,0),(5.5,3.8,0),(0,-3.8,0)]}
 
 state = {
     "hp": MAX_HP, "crystals": 0, "stage": 1, "alive": True, "won": False, "transition": False, "transition_until": 0.0,
     "last_attack": -99.0, "last_dash": -99.0, "dash_until": 0.0, "dash_dir": Vector((0,0,0)), "invuln": 0.0, "keys": set(),
-    "enemies": [], "drops": [], "pulse": None
+    "enemies": [], "drops": [], "pulse": None, "boss": None, "boss_hp": BOSS_HP, "boss_last_attack": -99.0, "boss_active": False
 }
 
 # Remove decorative center crystal from the cinematic scene.
@@ -105,7 +111,10 @@ def make_text(name, body, loc, size):
 hud = make_text("GAME_HUD", "", (0,5.0,.5), .38)
 
 def update_hud():
-    hud.data.body = f"STARFALL DASH   |   STAGE {state['stage']}/{STAGES}   |   HP {state['hp']}/{MAX_HP}   |   CRYSTALS {state['crystals']}/{CRYSTALS_PER_STAGE}"
+    if state["boss_active"]:
+        hud.data.body = f"STARFALL DASH   |   STAR EATER   |   HP {state['hp']}/{MAX_HP}   |   BOSS {state['boss_hp']}/{BOSS_HP}"
+    else:
+        hud.data.body = f"STARFALL DASH   |   STAGE {state['stage']}/{STAGES}   |   HP {state['hp']}/{MAX_HP}   |   CRYSTALS {state['crystals']}/{CRYSTALS_PER_STAGE}"
 
 def message(body):
     for name in ("GAME_MESSAGE","GAME_OVER","GAME_WIN"):
@@ -137,6 +146,68 @@ def spawn_stage():
         e.hide_render=False
     update_hud()
 
+def spawn_boss():
+    for e in list(state["enemies"]):
+        e.hide_viewport = True
+        e.hide_render = True
+    state["enemies"].clear()
+    for c in list(state["drops"]):
+        aura = bpy.data.objects.get(c.name+"_AURA")
+        if c.name in scene.objects:
+            bpy.data.objects.remove(c, do_unlink=True)
+        if aura:
+            bpy.data.objects.remove(aura, do_unlink=True)
+    state["drops"].clear()
+    boss = bpy.data.objects.get("STAR_EATER_BOSS")
+    if not boss:
+        bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=3, radius=1.0, location=(3.0,0,0))
+        boss = bpy.context.object
+        boss.name = "STAR_EATER_BOSS"
+        boss.data.materials.append(BOSS)
+        for p in boss.data.polygons:
+            p.use_smooth = True
+        bpy.ops.mesh.primitive_torus_add(major_radius=1.35, minor_radius=.055, major_segments=48, location=boss.location)
+        aura = bpy.context.object
+        aura.name = "STAR_EATER_BOSS_AURA"
+        aura.data.materials.append(BOSS_AURA)
+        aura.rotation_euler=(math.radians(65),0,0)
+    boss.location=(3.0,0,0)
+    boss.scale=(1.55,1.55,1.55)
+    boss.hide_viewport=False
+    boss.hide_render=False
+    aura=bpy.data.objects.get("STAR_EATER_BOSS_AURA")
+    if aura:
+        aura.location=boss.location
+        aura.hide_viewport=False
+        aura.hide_render=False
+    state["boss"]=boss
+    state["boss_hp"]=BOSS_HP
+    state["boss_last_attack"]=-99.0
+    state["boss_active"]=True
+    state["crystals"]=0
+    hero.location=(-4.5,0,0)
+    update_hud()
+    message("STAR EATER — DEFEAT THE BOSS")
+
+def damage_boss():
+    boss=state["boss"]
+    if not state["boss_active"] or not boss or boss.hide_viewport:
+        return
+    state["boss_hp"]-=1
+    boss.scale=(1.75,1.75,1.75)
+    boss["hit_until"]=time.monotonic()+.12
+    update_hud()
+    if state["boss_hp"]<=0:
+        boss.hide_viewport=True
+        boss.hide_render=True
+        aura=bpy.data.objects.get("STAR_EATER_BOSS_AURA")
+        if aura:
+            aura.hide_viewport=True
+            aura.hide_render=True
+        state["boss_active"]=False
+        state["won"]=True
+        message("STAR EATER DEFEATED — COSMIC CORE RESTORED")
+
 def kill_enemy(enemy):
     if enemy not in state["enemies"]:
         return
@@ -164,9 +235,12 @@ def attack(now):
     pulse["created"]=now
     state["pulse"]=pulse
 
-    for enemy in list(state["enemies"]):
-        if dist(hero,enemy) <= ABILITY_RANGE:
-            kill_enemy(enemy)
+    if state["boss_active"] and state["boss"] and dist(hero,state["boss"]) <= ABILITY_RANGE + .25:
+        damage_boss()
+    else:
+        for enemy in list(state["enemies"]):
+            if dist(hero,enemy) <= ABILITY_RANGE:
+                kill_enemy(enemy)
 
 def dash(now):
     if not state["alive"] or state["won"] or state["transition"] or now-state["last_dash"] < DASH_COOLDOWN:
@@ -212,19 +286,28 @@ def collect():
                     state["stage"] += 1
                     message("STAGE COMPLETE   —   NEXT STAGE")
                 else:
-                    state["won"] = True
-                    message("COSMIC CORE RESTORED   —   YOU WIN!")
+                    state["transition"] = True
+                    state["transition_until"] = time.monotonic() + 1.2
+                    message("STAGE COMPLETE — BOSS INCOMING")
 
 def reset():
     for o in list(scene.objects):
         if o.name.startswith(("DROP_CRYSTAL_","GAME_MESSAGE","GAME_OVER","GAME_WIN","ABILITY_")):
             bpy.data.objects.remove(o,do_unlink=True)
     state.update({"hp":MAX_HP,"crystals":0,"stage":1,"alive":True,"won":False,"transition":False,"transition_until":0.0,
-                  "last_attack":-99.0,"invuln":0.0,"keys":set(),
-                  "enemies":[],"drops":[],"pulse":None})
+                  "last_attack":-99.0,"last_dash":-99.0,"dash_until":0.0,"dash_dir":Vector((0,0,0)),"invuln":0.0,"keys":set(),
+                  "enemies":[],"drops":[],"pulse":None,"boss":None,"boss_hp":BOSS_HP,"boss_last_attack":-99.0,"boss_active":False})
     hero.location=(-5.2,0,0)
     hero.hide_viewport=False
     hero.hide_render=False
+    boss=bpy.data.objects.get("STAR_EATER_BOSS")
+    if boss:
+        boss.hide_viewport=True
+        boss.hide_render=True
+    boss_aura=bpy.data.objects.get("STAR_EATER_BOSS_AURA")
+    if boss_aura:
+        boss_aura.hide_viewport=True
+        boss_aura.hide_render=True
     for i in range(1,6):
         e=bpy.data.objects.get(f"Enemy_{i}")
         if e:
@@ -280,8 +363,11 @@ class STARFALL_OT_PLAY(bpy.types.Operator):
                 hero.location=(-5.2,0,0)
                 state["last_attack"]=now
                 state["last_dash"]=now
-                spawn_stage()
-                message("NEW STAGE — COLLECT 3 CRYSTALS")
+                if state["stage"] == STAGES and not state["boss_active"] and not state["won"]:
+                    spawn_boss()
+                else:
+                    spawn_stage()
+                    message("NEW STAGE — COLLECT 3 CRYSTALS")
 
             if state["alive"] and not state["won"] and not state["transition"]:
                 d=Vector((0,0,0))
@@ -301,6 +387,18 @@ class STARFALL_OT_PLAY(bpy.types.Operator):
                     if d.length:
                         e.location += d.normalized()*min(enemy_speed*dt,d.length)
                     if dist(hero,e)<1.1:
+                        damage(now)
+
+                if state["boss_active"] and state["boss"] and not state["boss"].hide_viewport:
+                    boss=state["boss"]
+                    d=Vector((hero.location.x-boss.location.x,hero.location.y-boss.location.y,0))
+                    if d.length:
+                        boss.location += d.normalized()*min(BOSS_SPEED*dt,d.length)
+                    aura=bpy.data.objects.get("STAR_EATER_BOSS_AURA")
+                    if aura:
+                        aura.location=boss.location
+                    if dist(hero,boss)<BOSS_CONTACT_RANGE and now-state["boss_last_attack"]>=BOSS_ATTACK_COOLDOWN:
+                        state["boss_last_attack"]=now
                         damage(now)
                 collect()
 
@@ -352,8 +450,8 @@ print("WASD / Arrows = move")
 print("SPACE = close-range attack")
 print("LEFT SHIFT = dash / brief invulnerability")
 print("Kill enemies -> collect their dropped crystals")
-print("3 crystals per stage; 3 stages = WIN")
-print("Enemy contact = damage")
+print("3 crystals per stage; after stage 3, face the Star Eater boss")
+print("Enemy contact = damage; boss is a close-range duel")
 print("R = restart after death or victory")
 print("ESC = stop")
 print("========================================")
