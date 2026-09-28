@@ -149,9 +149,10 @@ def kill_enemy(enemy):
             o.hide_render=True
     state["enemies"].remove(enemy)
     state["drops"].append(make_crystal((pos.x,pos.y,.25),len(state["drops"])+1))
+    update_hud()
 
 def attack(now):
-    if not state["alive"] or state["won"] or now-state["last_attack"] < ABILITY_COOLDOWN:
+    if not state["alive"] or state["won"] or state["transition"] or now-state["last_attack"] < ABILITY_COOLDOWN:
         return
     state["last_attack"]=now
     bpy.ops.mesh.primitive_torus_add(
@@ -198,6 +199,7 @@ def collect():
             state["crystals"]+=1
             c.hide_viewport=True
             c.hide_render=True
+            state["drops"].remove(c)
             aura=bpy.data.objects.get(c.name+"_AURA")
             if aura:
                 aura.hide_viewport=True
@@ -276,6 +278,8 @@ class STARFALL_OT_PLAY(bpy.types.Operator):
             if state["transition"] and now >= state["transition_until"]:
                 state["transition"] = False
                 hero.location=(-5.2,0,0)
+                state["last_attack"]=now
+                state["last_dash"]=now
                 spawn_stage()
                 message("NEW STAGE — COLLECT 3 CRYSTALS")
 
@@ -291,10 +295,11 @@ class STARFALL_OT_PLAY(bpy.types.Operator):
                 hero.location.x=max(BOUNDS[0],min(BOUNDS[1],hero.location.x))
                 hero.location.y=max(BOUNDS[2],min(BOUNDS[3],hero.location.y))
 
+                enemy_speed = 1.15 + (state["stage"] - 1) * 0.28
                 for e in list(state["enemies"]):
                     d=Vector((hero.location.x-e.location.x,hero.location.y-e.location.y,0))
                     if d.length:
-                        e.location += d.normalized()*min(1.15*dt,d.length)
+                        e.location += d.normalized()*min(enemy_speed*dt,d.length)
                     if dist(hero,e)<1.1:
                         damage(now)
                 collect()
