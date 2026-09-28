@@ -205,17 +205,16 @@ def reset():
     hero.location=(-5.2,0,0)
     hero.hide_viewport=False
     hero.hide_render=False
-    for i in range(1,4):
+    for i in range(1,6):
         e=bpy.data.objects.get(f"Enemy_{i}")
         if e:
-            e.location=enemy_positions[i-1]
-            e.hide_viewport=False
-            e.hide_render=False
-            state["enemies"].append(e)
+            e.hide_viewport=True
+            e.hide_render=True
             for o in scene.objects:
                 if o.name.startswith(e.name+"_Spike"):
-                    o.hide_viewport=False
-                    o.hide_render=False
+                    o.hide_viewport=True
+                    o.hide_render=True
+    spawn_stage()
     update_hud()
 
 class STARFALL_OT_PLAY(bpy.types.Operator):
@@ -225,6 +224,10 @@ class STARFALL_OT_PLAY(bpy.types.Operator):
     last=0
 
     def execute(self,context):
+        if scene.get("STARFALL_RUNNING", False):
+            print("Starfall Dash prototype is already running.")
+            return {"CANCELLED"}
+        scene["STARFALL_RUNNING"] = True
         self.last=time.monotonic()
         self.timer=context.window_manager.event_timer_add(.016,window=context.window)
         context.window_manager.modal_handler_add(self)
@@ -300,6 +303,7 @@ class STARFALL_OT_PLAY(bpy.types.Operator):
             context.window_manager.event_timer_remove(self.timer)
             self.timer=None
         state["keys"].clear()
+        scene["STARFALL_RUNNING"] = False
         print("Starfall Dash prototype stopped.")
         return {"CANCELLED"}
 
