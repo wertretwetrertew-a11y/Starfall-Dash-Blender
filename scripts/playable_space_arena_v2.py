@@ -62,7 +62,7 @@ STAGE_LAYOUTS = {1:[(-1.5,2.5,0),(-.5,-3,0),(2.3,-1.3,0)],2:[(-2.5,3.5,0),(1,3,0
 state = {
     "hp": MAX_HP, "crystals": 0, "stage": 1, "alive": True, "won": False, "transition": False, "transition_until": 0.0,
     "last_attack": -99.0, "last_dash": -99.0, "dash_until": 0.0, "dash_dir": Vector((0,0,0)), "invuln": 0.0, "keys": set(),
-    "enemies": [], "drops": [], "pulse": None, "boss": None, "boss_hp": BOSS_HP, "boss_last_attack": -99.0, "boss_active": False, "boss_phase": 1
+    "enemies": [], "drops": [], "pulse": None, "boss": None, "boss_hp": BOSS_HP, "boss_last_attack": -99.0, "boss_active": False, "boss_phase": 1, "message_until": 0.0
 }
 
 # Remove decorative center crystal from the cinematic scene.
@@ -129,11 +129,13 @@ def update_hud():
     else:
         hud.data.body = f"STARFALL DASH   |   STAGE {state['stage']}/{STAGES}   |   HP {state['hp']}/{MAX_HP}   |   CRYSTALS {state['crystals']}/{CRYSTALS_PER_STAGE}"
 
-def message(body):
+def message(body, duration=1.5):
     for name in ("GAME_MESSAGE","GAME_OVER","GAME_WIN"):
         o=bpy.data.objects.get(name)
         if o: bpy.data.objects.remove(o,do_unlink=True)
-    return make_text("GAME_MESSAGE",body,(0,0,.6),.65)
+    msg = make_text("GAME_MESSAGE",body,(0,0,.6),.65)
+    state["message_until"] = time.monotonic() + duration
+    return msg
 
 def spawn_stage():
     for e in list(state["enemies"]):
@@ -201,7 +203,7 @@ def spawn_boss():
     state["crystals"]=0
     hero.location=(-4.5,0,0)
     update_hud()
-    message("STAR EATER — DEFEAT THE BOSS")
+    message("STAR EATER — DEFEAT THE BOSS", 2.5)
 
 def damage_boss():
     boss=state["boss"]
@@ -212,6 +214,7 @@ def damage_boss():
         state["boss_phase"]=2
     boss.scale=(1.75,1.75,1.75)
     boss["hit_until"]=time.monotonic()+.12
+    boss["base_scale"]=1.55
     update_hud()
     if state["boss_hp"]<=0:
         boss.hide_viewport=True
@@ -222,7 +225,7 @@ def damage_boss():
             aura.hide_render=True
         state["boss_active"]=False
         state["won"]=True
-        message("STAR EATER DEFEATED — COSMIC CORE RESTORED")
+        message("STAR EATER DEFEATED — COSMIC CORE RESTORED", 9999)
 
 def kill_enemy(enemy):
     if enemy not in state["enemies"]:
@@ -281,7 +284,7 @@ def damage(now):
     update_hud()
     if state["hp"]<=0:
         state["alive"]=False
-        message("DESTROYED   —   press R to restart")
+        message("DESTROYED   —   press R to restart", 9999)
 
 def collect():
     for c in list(state["drops"]):
@@ -300,11 +303,11 @@ def collect():
                     state["transition"] = True
                     state["transition_until"] = time.monotonic() + 1.2
                     state["stage"] += 1
-                    message("STAGE COMPLETE   —   NEXT STAGE")
+                    message("STAGE COMPLETE   —   NEXT STAGE", 1.2)
                 else:
                     state["transition"] = True
                     state["transition_until"] = time.monotonic() + 1.2
-                    message("STAGE COMPLETE — BOSS INCOMING")
+                    message("STAGE COMPLETE — BOSS INCOMING", 1.8)
 
 def reset():
     for o in list(scene.objects):
@@ -312,7 +315,7 @@ def reset():
             bpy.data.objects.remove(o,do_unlink=True)
     state.update({"hp":MAX_HP,"crystals":0,"stage":1,"alive":True,"won":False,"transition":False,"transition_until":0.0,
                   "last_attack":-99.0,"last_dash":-99.0,"dash_until":0.0,"dash_dir":Vector((0,0,0)),"invuln":0.0,"keys":set(),
-                  "enemies":[],"drops":[],"pulse":None,"boss":None,"boss_hp":BOSS_HP,"boss_last_attack":-99.0,"boss_active":False,"boss_phase":1})
+                  "enemies":[],"drops":[],"pulse":None,"boss":None,"boss_hp":BOSS_HP,"boss_last_attack":-99.0,"boss_active":False,"boss_phase":1,"message_until":0.0})
     hero.location=(-5.2,0,0)
     hero.hide_viewport=False
     hero.hide_render=False
@@ -383,7 +386,7 @@ class STARFALL_OT_PLAY(bpy.types.Operator):
                     spawn_boss()
                 else:
                     spawn_stage()
-                    message("NEW STAGE — COLLECT 3 CRYSTALS")
+                    message("NEW STAGE — COLLECT 3 CRYSTALS", 1.2)
 
             if state["alive"] and not state["won"] and not state["transition"]:
                 d=Vector((0,0,0))
@@ -419,6 +422,17 @@ class STARFALL_OT_PLAY(bpy.types.Operator):
                         state["boss_last_attack"]=now
                         damage(now)
                 collect()
+
+            boss=state["boss"]
+            if boss and boss.name in scene.objects and "hit_until" in boss:
+                if now >= boss["hit_until"] and not boss.hide_viewport:
+                    base = 1.55
+                    boss.scale=(base,base,base)
+
+            msg=bpy.data.objects.get("GAME_MESSAGE")
+            if msg and state["message_until"] and now >= state["message_until"] and state["alive"] and not state["won"]:
+                bpy.data.objects.remove(msg,do_unlink=True)
+                state["message_until"]=0.0
 
             pulse=state["pulse"]
             if pulse and pulse.name in scene.objects:
