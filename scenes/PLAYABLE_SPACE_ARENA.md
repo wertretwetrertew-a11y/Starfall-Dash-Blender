@@ -69,8 +69,8 @@ After the basic loop feels good, this prototype can be expanded with:
 ## Current prototype progression
 
 - Stage 1: 3 enemies, collect 3 crystals.
-- Stage 2: 4 enemies, collect 3 crystals.
-- Stage 3: 5 enemies, collect 3 crystals.
+- Stage 2: 4 enemies, collect 3 crystals; enemies move faster.
+- Stage 3: 5 enemies, collect 3 crystals; enemies move faster again.
 - After completing a stage, the arena resets its enemy group and the player is repositioned for the next stage.
 - The prototype prevents duplicate gameplay timers when the launcher is run twice.
 - Reset clears stage-created drops and hides all known enemy slots before rebuilding Stage 1.
@@ -81,3 +81,8 @@ The final boss encounter is intentionally left as the next gameplay milestone so
 ## Design direction
 
 The prototype now treats movement and positioning as part of combat: the player has no ranged weapon, so the dash provides a controlled way to enter or escape close-range encounters. Dash cooldown and brief invulnerability are intentionally short so it remains a defensive tool rather than a permanent escape.
+
+
+### Stability notes
+
+The stage transition disables movement and combat input, resets attack/dash cooldown state for the new arena, and removes collected drops from the active drop list. This prevents repeated collection or attack effects from firing during the transition window.
