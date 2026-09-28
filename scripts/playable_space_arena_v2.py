@@ -417,11 +417,21 @@ class STARFALL_OT_PLAY(bpy.types.Operator):
                     aura=bpy.data.objects.get("STAR_EATER_BOSS_AURA")
                     if aura:
                         aura.location=boss.location
+                        aura.rotation_euler.z += dt * (2.4 if state["boss_phase"] == 2 else 1.2)
                     boss_cooldown = BOSS_PHASE2_COOLDOWN if state["boss_phase"] == 2 else BOSS_ATTACK_COOLDOWN
                     if dist(hero,boss)<BOSS_CONTACT_RANGE and now-state["boss_last_attack"]>=boss_cooldown:
                         state["boss_last_attack"]=now
                         damage(now)
                 collect()
+
+            for index, crystal in enumerate(list(state["drops"])):
+                if crystal.name in scene.objects and not crystal.hide_viewport:
+                    crystal.rotation_euler.z += dt * 2.2
+                    crystal.location.z = 0.25 + math.sin(now * 4.0 + index) * 0.08
+                    aura = bpy.data.objects.get(crystal.name+"_AURA")
+                    if aura:
+                        aura.location = crystal.location
+                        aura.rotation_euler.z += dt * 1.4
 
             boss=state["boss"]
             if boss and boss.name in scene.objects and "hit_until" in boss:
