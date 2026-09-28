@@ -62,6 +62,8 @@ BOSS_ATTACK_COOLDOWN = 1.15
 BOSS_PHASE2_SPEED = 1.75
 BOSS_PHASE2_COOLDOWN = 0.8
 BOUNDS = (-8, 8, -5.5, 5.5)
+HERO_SPAWN = Vector((-5.2, 0, 0))
+MIN_SAFE_SPAWN_DISTANCE = 3.2
 STAGE_LAYOUTS = {1:[(-1.5,2.5,0),(-.5,-3,0),(2.3,-1.3,0)],2:[(-2.5,3.5,0),(1,3,0),(3.5,-2.5,0),(-3.5,-2,0)],3:[(-5.5,4.2,0),(-1.8,4.5,0),(2,4.3,0),(5.5,3.8,0),(0,-3.8,0)]}
 
 state = {
@@ -99,6 +101,20 @@ for i in range(1, 4):
 
 def dist(a,b):
     return math.hypot(a.x-b.x, a.y-b.y)
+
+def object_exists(obj):
+    return bool(obj) and bpy.data.objects.get(obj.name) is obj
+
+def safe_spawn_location(loc):
+    p = Vector(loc)
+    away = Vector((p.x - HERO_SPAWN.x, p.y - HERO_SPAWN.y, 0))
+    if away.length < MIN_SAFE_SPAWN_DISTANCE:
+        away = Vector((1, 0, 0)) if not away.length else away.normalized()
+        p = HERO_SPAWN + away.normalized() * MIN_SAFE_SPAWN_DISTANCE
+    p.x = max(BOUNDS[0] + .7, min(BOUNDS[1] - .7, p.x))
+    p.y = max(BOUNDS[2] + .7, min(BOUNDS[3] - .7, p.y))
+    p.z = loc[2]
+    return p
 
 def make_crystal(loc, number):
     bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=2, radius=.38, location=loc)
@@ -150,11 +166,12 @@ def spawn_stage():
     state["enemies"].clear()
     for c in list(state["drops"]):
         aura=bpy.data.objects.get(c.name+"_AURA")
-        if c.name in scene.objects: bpy.data.objects.remove(c, do_unlink=True)
+        if object_exists(c): bpy.data.objects.remove(c, do_unlink=True)
         if aura: bpy.data.objects.remove(aura, do_unlink=True)
     state["drops"].clear()
     state["crystals"]=0
     for i,loc in enumerate(STAGE_LAYOUTS[state["stage"]],1):
+        loc = safe_spawn_location(loc)
         e=bpy.data.objects.get(f"Enemy_{i}")
         if not e:
             bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=2,radius=.62,location=loc)
@@ -202,7 +219,7 @@ def spawn_boss():
     state["enemies"].clear()
     for c in list(state["drops"]):
         aura = bpy.data.objects.get(c.name+"_AURA")
-        if c.name in scene.objects:
+        if object_exists(c):
             bpy.data.objects.remove(c, do_unlink=True)
         if aura:
             bpy.data.objects.remove(aura, do_unlink=True)
@@ -220,7 +237,7 @@ def spawn_boss():
         aura.name = "STAR_EATER_BOSS_AURA"
         aura.data.materials.append(BOSS_AURA)
         aura.rotation_euler=(math.radians(65),0,0)
-    boss.location=(3.0,0,0)
+    boss.location=safe_spawn_location((3.0,0,0))
     boss.scale=(1.55,1.55,1.55)
     boss.hide_viewport=False
     boss.hide_render=False
@@ -344,9 +361,17 @@ def damage(now):
         state["alive"]=False
         message("DESTROYED   —   press R to restart", 9999)
 
+def spawn_pickup_effect(loc):
+    bpy.ops.mesh.primitive_torus_add(major_radius=.22, minor_radius=.045, major_segments=32, location=loc)
+    fx = bpy.context.object
+    fx.name = f"ABILITY_PICKUP_{int(time.monotonic()*1000)}"
+    fx.data.materials.append(PULSE)
+    fx["created"] = time.monotonic()
+
 def collect():
     for c in list(state["drops"]):
         if not c.hide_viewport and dist(hero,c)<.95:
+            pickup_pos = c.location.copy()
             state["crystals"]+=1
             c.hide_viewport=True
             c.hide_render=True
@@ -355,6 +380,7 @@ def collect():
             if aura:
                 aura.hide_viewport=True
                 aura.hide_render=True
+            spawn_pickup_effect(pickup_pos)
             update_hud()
             if state["crystals"]>=CRYSTALS_PER_STAGE:
                 if state["stage"] < STAGES:
@@ -467,15 +493,17 @@ class STARFALL_OT_PLAY(bpy.types.Operator):
                     if e.get("knockback_until", 0.0) > now:
                         kb=e.get("knockback_dir", Vector((0,0,0)))
                         e.location += kb * (3.0 + e.get("knockback", .9) * 2.0) * dt
+                    e.location.x=max(BOUNDS[0] + .6,min(BOUNDS[1] - .6,e.location.x))
+                    e.location.y=max(BOUNDS[2] + .6,min(BOUNDS[3] - .6,e.location.y))
                     contact_range = {"fast": .95, "heavy": 1.25, "normal": 1.1}.get(e.get("role"), 1.1)
                     if dist(hero,e)<contact_range:
                         damage(now)
 
                 for e in list(state["enemies"]):
-                    if e.name in scene.objects and e.get("hit_until", 0.0) > now:
+                    if object_exists(e) and e.get("hit_until", 0.0) > now:
                         base = {"fast": .72, "heavy": 1.28, "normal": 1.0}.get(e.get("role"), 1.0)
                         e.scale=(base*1.14,base*1.14,base*1.14)
-                    elif e.name in scene.objects:
+                    elif object_exists(e):
                         base = {"fast": .72, "heavy": 1.28, "normal": 1.0}.get(e.get("role"), 1.0)
                         e.scale=(base,base,base)
 
@@ -496,7 +524,7 @@ class STARFALL_OT_PLAY(bpy.types.Operator):
                 collect()
 
             for index, crystal in enumerate(list(state["drops"])):
-                if crystal.name in scene.objects and not crystal.hide_viewport:
+                if object_exists(crystal) and not crystal.hide_viewport:
                     crystal.rotation_euler.z += dt * 2.2
                     crystal.location.z = 0.25 + math.sin(now * 4.0 + index) * 0.08
                     aura = bpy.data.objects.get(crystal.name+"_AURA")
@@ -505,7 +533,7 @@ class STARFALL_OT_PLAY(bpy.types.Operator):
                         aura.rotation_euler.z += dt * 1.4
 
             boss=state["boss"]
-            if boss and boss.name in scene.objects and "hit_until" in boss:
+            if object_exists(boss) and "hit_until" in boss:
                 if now >= boss["hit_until"] and not boss.hide_viewport:
                     base = 1.55
                     boss.scale=(base,base,base)
@@ -516,7 +544,7 @@ class STARFALL_OT_PLAY(bpy.types.Operator):
                 state["message_until"]=0.0
 
             trail=bpy.data.objects.get("ABILITY_DASH_TRAIL")
-            if trail and trail.name in scene.objects:
+            if object_exists(trail):
                 age=now-trail["created"]
                 trail.location=hero.location-state["dash_dir"]*.38
                 trail.scale=hero.scale*(1.08+max(0,.22-age)*1.6)
@@ -529,13 +557,21 @@ class STARFALL_OT_PLAY(bpy.types.Operator):
                 hero.scale=HERO_BASE_SCALE
 
             pulse=state["pulse"]
-            if pulse and pulse.name in scene.objects:
+            if object_exists(pulse):
                 age=now-pulse["created"]
                 pulse.location=hero.location
                 pulse.scale=(1+age*5,1+age*5,1+age*5)
                 if age>.35:
                     bpy.data.objects.remove(pulse,do_unlink=True)
                     state["pulse"]=None
+
+            for fx in list(scene.objects):
+                if fx.name.startswith("ABILITY_PICKUP_"):
+                    age=now-fx["created"]
+                    fx.scale=(1+age*6,1+age*6,1+age*6)
+                    fx.rotation_euler.z += dt*5.0
+                    if age>.28:
+                        bpy.data.objects.remove(fx,do_unlink=True)
 
             # Real-time camera follow.
             cam=bpy.data.objects.get("Cinematic_Camera")
