@@ -10,6 +10,8 @@ hero = bpy.data.objects.get("PLAYER_CUBE")
 if not hero:
     raise RuntimeError("Run scripts/space_arena.py first.")
 
+HERO_BASE_SCALE = hero.scale.copy()
+
 # Stop cinematic animation.
 hero.animation_data_clear()
 # Keep the inner core attached to the cube at the correct local position.
@@ -293,7 +295,7 @@ def dash(now):
     bpy.ops.mesh.primitive_cube_add(size=1, location=hero.location)
     trail=bpy.context.object
     trail.name="ABILITY_DASH_TRAIL"
-    trail.scale=hero.scale*1.08
+    trail.scale=HERO_BASE_SCALE*1.08
     trail.data.materials.append(PULSE)
     trail["created"]=now
     state["invuln"]=max(state["invuln"],state["dash_until"])
@@ -477,9 +479,9 @@ class STARFALL_OT_PLAY(bpy.types.Operator):
                     bpy.data.objects.remove(trail,do_unlink=True)
 
             if now < state["damage_flash_until"]:
-                hero.scale=(1.12,1.12,1.12)
+                hero.scale=HERO_BASE_SCALE*1.12
             else:
-                hero.scale=(1,1,1)
+                hero.scale=HERO_BASE_SCALE
 
             pulse=state["pulse"]
             if pulse and pulse.name in scene.objects:
