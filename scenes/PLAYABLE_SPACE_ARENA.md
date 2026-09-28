@@ -57,12 +57,9 @@ The prototype is designed to test the feel of:
 After the basic loop feels good, this prototype can be expanded with:
 - better close-range attack animation;
 - hit-stop and impact effects;
-- enemy variants;
-- health bar;
-- crystal attraction/pickup effect;
+- a compact stage progress indicator;
 - a proper start/restart screen;
-- boss encounter;
-- stage transitions;
+- more varied boss patterns while keeping melee-only combat;
 - a more faithful recreation of the 2D game's movement and combat rules.
 
 
@@ -108,3 +105,12 @@ Normal enemies use the baseline pursuit speed. Fast enemies are smaller and clos
 ### Visual roles
 
 Enemy roles are visually separated as well as mechanically: normal enemies use the baseline look, fast enemies use a brighter high-energy material and smaller body, and heavy enemies use a darker high-energy material and larger body. Contact ranges are tuned to their silhouettes. All remain melee-only.
+
+
+### Latest stability pass
+
+The playable script now initializes Stage 1 through the same stage-spawn path used by later stages, so enemy roles, HP, speed and materials are configured immediately after launch.
+
+Stage spawn points are validated against the player start position so enemies cannot appear directly beside the cube. Enemy movement is also clamped to the arena bounds, including the knockback reaction.
+
+Crystal collection now produces a short expanding pickup pulse without adding persistent UI clutter. Object-existence checks were hardened so temporary gameplay effects and removed objects are not accidentally treated as active Blender scene objects.
