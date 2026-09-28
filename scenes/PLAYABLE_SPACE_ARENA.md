@@ -12,8 +12,8 @@ It is intentionally separate from the main 2D Starfall Dash game.
 - Touching an enemy costs **1 HP**.
 - The player starts with **5 HP**.
 - Defeated enemies create crystal drops.
-- Collect **3 crystals** to win.
-- **R** — restart after death.
+- Collect **3 crystals per stage**. There are **3 stages**, with enemy pressure increasing from 3 to 4 to 5 enemies.
+- **R** — restart after death or victory.
 - **ESC** — stop the prototype.
 
 There are no ranged attacks in this prototype.
@@ -64,3 +64,15 @@ After the basic loop feels good, this prototype can be expanded with:
 - boss encounter;
 - stage transitions;
 - a more faithful recreation of the 2D game's movement and combat rules.
+
+
+## Current prototype progression
+
+- Stage 1: 3 enemies, collect 3 crystals.
+- Stage 2: 4 enemies, collect 3 crystals.
+- Stage 3: 5 enemies, collect 3 crystals.
+- After completing a stage, the arena resets its enemy group and the player is repositioned for the next stage.
+- The prototype prevents duplicate gameplay timers when the launcher is run twice.
+- Reset clears stage-created drops and hides all known enemy slots before rebuilding Stage 1.
+
+The final boss encounter is intentionally left as the next gameplay milestone so it can be implemented and tested separately rather than adding unverified combat logic to the current stable loop.
