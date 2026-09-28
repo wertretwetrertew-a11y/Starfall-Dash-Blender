@@ -23,14 +23,14 @@ There are no ranged attacks in this prototype.
 1. Open Blender 3.x/4.x.
 2. Open the repository script: scripts/space_arena.py
 3. Run it first. This creates the Space Arena.
-4. Then open: scripts/playable_space_arena.py
+4. Then open: scripts/playable_space_arena_v2.py
 5. Run that script.
 6. Move the mouse over the **3D Viewport** so Blender sends keyboard input to the viewport.
 7. Press **WASD** or the arrow keys.
 8. Use **Space** near an enemy.
 9. Collect three crystals.
 
-The prototype starts from the current PLAYER_CUBE, enemies, arena, planet, comets and camera created by space_arena.py.
+The v2 prototype starts from the current PLAYER_CUBE, enemies, arena, planet, comets and camera created by space_arena.py. It also saves a ready-to-test Starfall_Dash_Playable_Arena.blend.
 
 ## Important
 
