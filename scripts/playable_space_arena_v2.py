@@ -264,6 +264,20 @@ def kill_enemy(enemy):
     state["drops"].append(make_crystal((pos.x,pos.y,.25),len(state["drops"])+1))
     update_hud()
 
+def hit_enemy(enemy):
+    if enemy not in state["enemies"]:
+        return
+    enemy["hp"] = max(0, int(enemy.get("hp", 1)) - 1)
+    enemy["hit_until"] = time.monotonic() + .12
+    away = Vector((enemy.location.x-hero.location.x, enemy.location.y-hero.location.y, 0))
+    if away.length:
+        enemy["knockback_dir"] = away.normalized()
+        enemy["knockback_until"] = time.monotonic() + .10
+    if enemy["hp"] <= 0:
+        kill_enemy(enemy)
+    else:
+        enemy.scale = enemy.scale * 1.14
+
 def attack(now):
     if not state["alive"] or state["won"] or state["transition"] or now-state["last_attack"] < ABILITY_COOLDOWN:
         return
@@ -282,7 +296,7 @@ def attack(now):
     else:
         for enemy in list(state["enemies"]):
             if dist(hero,enemy) <= ABILITY_RANGE:
-                kill_enemy(enemy)
+                hit_enemy(enemy)
 
 def dash(now):
     if not state["alive"] or state["won"] or state["transition"] or now-state["last_dash"] < DASH_COOLDOWN:
