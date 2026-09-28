@@ -98,3 +98,8 @@ This is intentionally a first boss prototype: the fight is melee-only and uses s
 ### Boss phase 2
 
 At half HP the Star Eater enters Phase II. It moves faster and its close-range attack cooldown is shorter. The HUD displays the current boss phase. Re-running the gameplay script also hides any previous boss instance so an old encounter cannot leak into a new run.
+
+
+### Enemy roles
+
+Normal enemies use the baseline pursuit speed. Fast enemies are smaller and close distance quickly. Heavy enemies are larger and slower. All three remain melee-only, so the player still solves encounters through positioning, close-range attacks and Dash rather than ranged combat.
