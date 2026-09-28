@@ -451,8 +451,19 @@ class STARFALL_OT_PLAY(bpy.types.Operator):
                     d=Vector((hero.location.x-e.location.x,hero.location.y-e.location.y,0))
                     if d.length:
                         e.location += d.normalized()*min(enemy_speed*dt,d.length)
+                    if e.get("knockback_until", 0.0) > now:
+                        kb=e.get("knockback_dir", Vector((0,0,0)))
+                        e.location += kb * 4.0 * dt
                     if dist(hero,e)<1.1:
                         damage(now)
+
+                for e in list(state["enemies"]):
+                    if e.name in scene.objects and e.get("hit_until", 0.0) > now:
+                        base = {"fast": .72, "heavy": 1.28, "normal": 1.0}.get(e.get("role"), 1.0)
+                        e.scale=(base*1.14,base*1.14,base*1.14)
+                    elif e.name in scene.objects:
+                        base = {"fast": .72, "heavy": 1.28, "normal": 1.0}.get(e.get("role"), 1.0)
+                        e.scale=(base,base,base)
 
                 if state["boss_active"] and state["boss"] and not state["boss"].hide_viewport:
                     boss=state["boss"]
