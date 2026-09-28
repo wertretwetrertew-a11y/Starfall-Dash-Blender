@@ -103,3 +103,8 @@ At half HP the Star Eater enters Phase II. It moves faster and its close-range a
 ### Enemy roles
 
 Normal enemies use the baseline pursuit speed. Fast enemies are smaller and close distance quickly. Heavy enemies are larger and slower. All three remain melee-only, so the player still solves encounters through positioning, close-range attacks and Dash rather than ranged combat.
+
+
+### Visual roles
+
+Enemy roles are visually separated as well as mechanically: normal enemies use the baseline look, fast enemies use a brighter high-energy material and smaller body, and heavy enemies use a darker high-energy material and larger body. Contact ranges are tuned to their silhouettes. All remain melee-only.
