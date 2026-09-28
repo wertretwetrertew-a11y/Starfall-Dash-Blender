@@ -93,3 +93,8 @@ The stage transition disables movement and combat input, resets attack/dash cool
 After collecting the third set of 3 crystals, the normal enemies disappear and the prototype starts a 1-on-1 Star Eater encounter. The boss has its own HP bar, follows the player at a higher speed, and damages the player only at close range. The player's existing Space attack is the only way to damage it; Dash remains the defensive tool. Defeating the boss completes the prototype run.
 
 This is intentionally a first boss prototype: the fight is melee-only and uses simple pursuit/contact pressure before adding more complex boss phases.
+
+
+### Boss phase 2
+
+At half HP the Star Eater enters Phase II. It moves faster and its close-range attack cooldown is shorter. The HUD displays the current boss phase. Re-running the gameplay script also hides any previous boss instance so an old encounter cannot leak into a new run.
