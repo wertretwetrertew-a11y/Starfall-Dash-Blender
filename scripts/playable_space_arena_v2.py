@@ -40,6 +40,9 @@ PULSE = material("Gameplay_Pulse", (.1,.5,1), (.05,.5,1), 12)
 UI = material("Gameplay_UI", (.3,.9,1), (.1,.7,1), 8)
 BOSS = material("Gameplay_Boss", (.55,.08,1), (.7,.03,1), 18)
 BOSS_AURA = material("Gameplay_Boss_Aura", (.15,.02,.35), (.4,.02,1), 10)
+ENEMY_NORMAL = material("Gameplay_Enemy_Normal", (.9,.18,.08), (1,.05,.01), 7)
+ENEMY_FAST = material("Gameplay_Enemy_Fast", (.95,.65,.05), (1,.35,.01), 10)
+ENEMY_HEAVY = material("Gameplay_Enemy_Heavy", (.45,.12,.8), (.3,.02,1), 8)
 
 # Constants.
 SPEED = 6.5
@@ -162,6 +165,16 @@ def spawn_stage():
         # Three readable melee roles: normal, fast/fragile, heavy/slow.
         role = "normal" if i % 3 == 1 else ("fast" if i % 3 == 2 else "heavy")
         e["role"] = role
+        # Visual language matches combat role.
+        if role == "fast":
+            e.data.materials.clear()
+            e.data.materials.append(ENEMY_FAST)
+        elif role == "heavy":
+            e.data.materials.clear()
+            e.data.materials.append(ENEMY_HEAVY)
+        else:
+            e.data.materials.clear()
+            e.data.materials.append(ENEMY_NORMAL)
         if role == "fast":
             e["speed"] = 1.65 + (state["stage"] - 1) * .18
             e["hp"] = 1
@@ -453,8 +466,9 @@ class STARFALL_OT_PLAY(bpy.types.Operator):
                         e.location += d.normalized()*min(enemy_speed*dt,d.length)
                     if e.get("knockback_until", 0.0) > now:
                         kb=e.get("knockback_dir", Vector((0,0,0)))
-                        e.location += kb * 4.0 * dt
-                    if dist(hero,e)<1.1:
+                        e.location += kb * (3.0 + e.get("knockback", .9) * 2.0) * dt
+                    contact_range = {"fast": .95, "heavy": 1.25, "normal": 1.1}.get(e.get("role"), 1.1)
+                    if dist(hero,e)<contact_range:
                         damage(now)
 
                 for e in list(state["enemies"]):
