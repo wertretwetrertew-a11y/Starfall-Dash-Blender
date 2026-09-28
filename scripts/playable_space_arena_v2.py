@@ -164,12 +164,18 @@ def spawn_stage():
         e["role"] = role
         if role == "fast":
             e["speed"] = 1.65 + (state["stage"] - 1) * .18
+            e["hp"] = 1
+            e["knockback"] = 1.25
             e.scale = (.72,.72,.72)
         elif role == "heavy":
             e["speed"] = .82 + (state["stage"] - 1) * .12
+            e["hp"] = 3
+            e["knockback"] = .55
             e.scale = (1.28,1.28,1.28)
         else:
             e["speed"] = 1.15 + (state["stage"] - 1) * .28
+            e["hp"] = 1
+            e["knockback"] = .9
             e.scale = (1,1,1)
         e.location=loc
         e.hide_viewport=False
