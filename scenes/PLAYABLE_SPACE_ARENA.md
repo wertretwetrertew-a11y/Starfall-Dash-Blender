@@ -76,3 +76,8 @@ After the basic loop feels good, this prototype can be expanded with:
 - Reset clears stage-created drops and hides all known enemy slots before rebuilding Stage 1.
 
 The final boss encounter is intentionally left as the next gameplay milestone so it can be implemented and tested separately rather than adding unverified combat logic to the current stable loop.
+
+
+## Design direction
+
+The prototype now treats movement and positioning as part of combat: the player has no ranged weapon, so the dash provides a controlled way to enter or escape close-range encounters. Dash cooldown and brief invulnerability are intentionally short so it remains a defensive tool rather than a permanent escape.
