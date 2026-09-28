@@ -438,7 +438,7 @@ class STARFALL_OT_PLAY(bpy.types.Operator):
 
             if state["transition"] and now >= state["transition_until"]:
                 state["transition"] = False
-                hero.location=(-5.2,0,0)
+                hero.location=HERO_SPAWN.copy()
                 state["last_attack"]=now
                 state["last_dash"]=now
                 if state["stage"] == STAGES and not state["boss_active"] and not state["won"]:
@@ -563,6 +563,7 @@ try:
 except:
     pass
 bpy.utils.register_class(STARFALL_OT_PLAY)
+spawn_stage()
 update_hud()
 
 # Save a ready-to-test Blender file.
