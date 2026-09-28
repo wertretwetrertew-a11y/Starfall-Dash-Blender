@@ -18,7 +18,6 @@ for name in ("GAME_HUD", "GAME_OVER_TEXT", "GAME_WIN_TEXT"):
     if obj:
         bpy.data.objects.remove(obj, do_unlink=True)
 
-# Remove old dropped crystals / pulse effects.
 for obj in list(bpy.context.scene.objects):
     if obj.name.startswith(("DROP_CRYSTAL_", "ABILITY_PULSE_")):
         bpy.data.objects.remove(obj, do_unlink=True)
@@ -29,10 +28,8 @@ hero = bpy.data.objects.get("PLAYER_CUBE")
 if hero is None:
     raise RuntimeError("PLAYER_CUBE not found. Run scripts/space_arena.py first.")
 
-# Stop the cinematic hero animation so keyboard control owns the cube.
 hero.animation_data_clear()
 
-# ---------- materials ----------
 def get_mat(name, color, emission=None, strength=0):
     m = bpy.data.materials.get(name) or bpy.data.materials.new(name)
     m.diffuse_color = (*color, 1)
@@ -49,7 +46,6 @@ CRYSTAL = get_mat("Gameplay_Crystal", (.05, .95, 1.0), (.02, .8, 1.0), 15)
 PULSE = get_mat("Ability_Pulse", (.1, .75, 1.0), (.05, .65, 1.0), 10)
 DAMAGE = get_mat("Damage_Flash", (1.0, .08, .12), (1.0, .02, .02), 8)
 
-# ---------- arena bounds ----------
 MIN_X, MAX_X = -8.0, 8.0
 MIN_Y, MAX_Y = -5.5, 5.5
 MOVE_SPEED = 6.5
@@ -59,7 +55,6 @@ PLAYER_MAX_HP = 5
 CONTACT_DAMAGE_COOLDOWN = 1.0
 REQUIRED_CRYSTALS = 3
 
-# ---------- game state ----------
 state = {
     "hp": PLAYER_MAX_HP,
     "crystals": 0,
@@ -74,13 +69,10 @@ state = {
     "pulse": None,
 }
 
-# ---------- remove decorative center crystal ----------
+# Remove the decorative center crystal. Gameplay crystals are created only by kills.
 for obj in list(scene.objects):
     if obj.name == "COSMIC_CORE_CRYSTAL" or obj.name.startswith("COSMIC_CORE_CRYSTAL"):
         bpy.data.objects.remove(obj, do_unlink=True)
-
-# ---------- create gameplay crystals ----------
-drop_positions = [(-1.8, 2.0, .25), (2.6, -2.0, .25), (4.0, 1.7, .25)]
 
 def create_crystal(name, loc):
     bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=2, radius=.38, location=loc)
@@ -92,7 +84,6 @@ def create_crystal(name, loc):
     for p in o.data.polygons:
         p.use_smooth = True
 
-    # small aura
     bpy.ops.mesh.primitive_torus_add(
         major_radius=.62, minor_radius=.018, major_segments=32,
         location=loc, rotation=(math.radians(65), 0, .4)
@@ -102,22 +93,17 @@ def create_crystal(name, loc):
     aura.data.materials.append(CRYSTAL)
     return o
 
-for i, pos in enumerate(drop_positions, 1):
-    state["drops"].append(create_crystal(f"DROP_CRYSTAL_{i}", pos))
-
-# ---------- collect existing enemies ----------
+# Collect existing enemies.
 for obj in scene.objects:
     if obj.name.startswith("Enemy_") and obj.type == "MESH" and "_Spike" not in obj.name:
         state["enemies"].append(obj)
 
-# Put enemies in a known playable arrangement.
 enemy_positions = [(-1.5, 2.5, 0), (-.5, -3.0, 0), (2.3, -1.3, 0)]
 for enemy, pos in zip(state["enemies"], enemy_positions):
     enemy.location = pos
     enemy.hide_viewport = False
     enemy.hide_render = False
 
-# ---------- HUD ----------
 def hud_text(name, body, x, y, size=.045):
     bpy.ops.object.text_add(location=(x, y, 0))
     o = bpy.context.object
@@ -129,15 +115,12 @@ def hud_text(name, body, x, y, size=.045):
     o.data.materials.append(CRYSTAL)
     return o
 
-# World-space HUD placed near the camera-facing side of the arena.
 hud = hud_text(
     "GAME_HUD",
     "STARFALL DASH  |  HP: 5/5  |  CRYSTALS: 0/3",
     -7.6, 5.05, .38
 )
-hud.rotation_euler = (0, 0, 0)
 
-# ---------- game text objects ----------
 def set_message(name, body):
     old = bpy.data.objects.get(name)
     if old:
@@ -147,7 +130,6 @@ def set_message(name, body):
     o.location.z = .5
     return o
 
-# ---------- effects ----------
 def make_pulse():
     bpy.ops.mesh.primitive_torus_add(
         major_radius=.25, minor_radius=.055, major_segments=48,
@@ -159,11 +141,6 @@ def make_pulse():
     ring["created_at"] = time.monotonic()
     return ring
 
-def flash_enemy(enemy):
-    enemy.data.materials.clear()
-    enemy.data.materials.append(DAMAGE)
-
-# ---------- game logic ----------
 def update_hud():
     hud.data.body = f"STARFALL DASH  |  HP: {state['hp']}/{PLAYER_MAX_HP}  |  CRYSTALS: {state['crystals']}/{REQUIRED_CRYSTALS}"
 
@@ -174,7 +151,6 @@ def kill_enemy(enemy):
     if enemy not in state["enemies"]:
         return
 
-    # Hide the enemy and its decorative spikes.
     pos = enemy.location.copy()
     enemy.hide_viewport = True
     enemy.hide_render = True
@@ -185,15 +161,10 @@ def kill_enemy(enemy):
             obj.hide_viewport = True
             obj.hide_render = True
 
-    # Drop a crystal from this enemy.
     idx = len(state["drops"]) + 1
     crystal = create_crystal(f"DROP_CRYSTAL_{idx}", (pos.x, pos.y, .25))
     state["drops"].append(crystal)
     state["enemies"].remove(enemy)
-
-    if len(state["enemies"]) == 0:
-        # All initial enemies defeated; remaining objective is collection.
-        pass
 
 def use_ability(now):
     if not state["alive"] or state["won"]:
@@ -219,7 +190,6 @@ def damage_player(now):
 
     if state["hp"] <= 0:
         state["alive"] = False
-        hero.hide_viewport = False
         set_message("GAME_OVER_TEXT", "DESTROYED  —  press R to restart")
     update_hud()
 
@@ -246,9 +216,6 @@ def move_enemies(dt, now):
         return
 
     for enemy in list(state["enemies"]):
-        if enemy.hide_viewport:
-            continue
-
         direction = Vector((hero.location.x - enemy.location.x, hero.location.y - enemy.location.y, 0))
         dist = direction.length
         if dist > .001:
@@ -259,7 +226,6 @@ def move_enemies(dt, now):
             damage_player(now)
 
 def restart_game():
-    # Remove generated drops.
     for obj in list(scene.objects):
         if obj.name.startswith("DROP_CRYSTAL_"):
             bpy.data.objects.remove(obj, do_unlink=True)
@@ -273,12 +239,12 @@ def restart_game():
     state["invulnerable_until"] = 0
     state["enemies"] = []
     state["drops"] = []
+    state["pulse"] = None
 
     hero.location = (-5.2, 0, 0)
     hero.hide_viewport = False
     hero.hide_render = False
 
-    # Restore original three enemies.
     for i, pos in enumerate(enemy_positions, 1):
         enemy = bpy.data.objects.get(f"Enemy_{i}")
         if enemy:
@@ -289,9 +255,6 @@ def restart_game():
             enemy.data.materials.append(bpy.data.materials.get("Enemy"))
             state["enemies"].append(enemy)
 
-    for i, pos in enumerate(drop_positions, 1):
-        state["drops"].append(create_crystal(f"DROP_CRYSTAL_{i}", pos))
-
     for name in ("GAME_OVER_TEXT", "GAME_WIN_TEXT"):
         obj = bpy.data.objects.get(name)
         if obj:
@@ -299,7 +262,6 @@ def restart_game():
 
     update_hud()
 
-# ---------- modal operator ----------
 class STARFALL_OT_SPACE_ARENA(bpy.types.Operator):
     bl_idname = "starfall.play_space_arena"
     bl_label = "Starfall Dash — Play Space Arena"
@@ -314,29 +276,18 @@ class STARFALL_OT_SPACE_ARENA(bpy.types.Operator):
             self.cancel(context)
             return {"CANCELLED"}
 
-        if event.type in {"W", "UP_ARROW"}:
+        key_map = {
+            "W": "UP", "UP_ARROW": "UP",
+            "S": "DOWN", "DOWN_ARROW": "DOWN",
+            "A": "LEFT", "LEFT_ARROW": "LEFT",
+            "D": "RIGHT", "RIGHT_ARROW": "RIGHT",
+        }
+        if event.type in key_map:
+            key = key_map[event.type]
             if event.value == "PRESS":
-                state["keys"].add("UP")
+                state["keys"].add(key)
             elif event.value == "RELEASE":
-                state["keys"].discard("UP")
-
-        if event.type in {"S", "DOWN_ARROW"}:
-            if event.value == "PRESS":
-                state["keys"].add("DOWN")
-            elif event.value == "RELEASE":
-                state["keys"].discard("DOWN")
-
-        if event.type in {"A", "LEFT_ARROW"}:
-            if event.value == "PRESS":
-                state["keys"].add("LEFT")
-            elif event.value == "RELEASE":
-                state["keys"].discard("LEFT")
-
-        if event.type in {"D", "RIGHT_ARROW"}:
-            if event.value == "PRESS":
-                state["keys"].add("RIGHT")
-            elif event.value == "RELEASE":
-                state["keys"].discard("RIGHT")
+                state["keys"].discard(key)
 
         if event.type == "SPACE" and event.value == "PRESS":
             use_ability(now)
@@ -369,7 +320,6 @@ class STARFALL_OT_SPACE_ARENA(bpy.types.Operator):
                 move_enemies(dt, now)
                 collect_crystals()
 
-            # Animate pulse ring and clean it up.
             pulse = state.get("pulse")
             if pulse and pulse.name in scene.objects:
                 age = now - pulse.get("created_at", now)
@@ -379,7 +329,8 @@ class STARFALL_OT_SPACE_ARENA(bpy.types.Operator):
                     bpy.data.objects.remove(pulse, do_unlink=True)
                     state["pulse"] = None
 
-            context.area.tag_redraw()
+            if context.area:
+                context.area.tag_redraw()
 
         return {"RUNNING_MODAL"}
 
@@ -401,7 +352,6 @@ class STARFALL_OT_SPACE_ARENA(bpy.types.Operator):
 
 bpy.utils.register_class(STARFALL_OT_SPACE_ARENA)
 
-# Camera follows the player while keeping the arena visible.
 cam = bpy.data.objects.get("Cinematic_Camera")
 if cam:
     def track_camera(scene):
@@ -412,7 +362,6 @@ if cam:
         cam.location.y += ((-11 + target.y) - cam.location.y) * .035
         cam.rotation_euler = (Vector((target.x, target.y, 0)) - cam.location).to_track_quat("-Z", "Y").to_euler()
 
-    # Avoid duplicate handler registrations.
     for h in list(bpy.app.handlers.frame_change_post):
         if getattr(h, "__name__", "") == "starfall_track_camera":
             bpy.app.handlers.frame_change_post.remove(h)
@@ -425,7 +374,8 @@ print("")
 print("=== STARFALL DASH PLAYABLE PROTOTYPE ===")
 print("WASD / Arrow Keys : move")
 print("SPACE             : close-range cosmic pulse")
-print("Collect 3 crystals to win.")
+print("Kill enemies to make them drop crystals.")
+print("Collect 3 dropped crystals to win.")
 print("Touching enemies damages the player.")
 print("R                 : restart after death")
 print("ESC               : stop prototype")
