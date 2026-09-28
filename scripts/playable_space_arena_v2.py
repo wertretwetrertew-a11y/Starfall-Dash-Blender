@@ -54,13 +54,15 @@ BOSS_HP = 10
 BOSS_SPEED = 1.35
 BOSS_CONTACT_RANGE = 1.35
 BOSS_ATTACK_COOLDOWN = 1.15
+BOSS_PHASE2_SPEED = 1.75
+BOSS_PHASE2_COOLDOWN = 0.8
 BOUNDS = (-8, 8, -5.5, 5.5)
 STAGE_LAYOUTS = {1:[(-1.5,2.5,0),(-.5,-3,0),(2.3,-1.3,0)],2:[(-2.5,3.5,0),(1,3,0),(3.5,-2.5,0),(-3.5,-2,0)],3:[(-5.5,4.2,0),(-1.8,4.5,0),(2,4.3,0),(5.5,3.8,0),(0,-3.8,0)]}
 
 state = {
     "hp": MAX_HP, "crystals": 0, "stage": 1, "alive": True, "won": False, "transition": False, "transition_until": 0.0,
     "last_attack": -99.0, "last_dash": -99.0, "dash_until": 0.0, "dash_dir": Vector((0,0,0)), "invuln": 0.0, "keys": set(),
-    "enemies": [], "drops": [], "pulse": None, "boss": None, "boss_hp": BOSS_HP, "boss_last_attack": -99.0, "boss_active": False
+    "enemies": [], "drops": [], "pulse": None, "boss": None, "boss_hp": BOSS_HP, "boss_last_attack": -99.0, "boss_active": False, "boss_phase": 1
 }
 
 # Remove decorative center crystal from the cinematic scene.
@@ -69,6 +71,16 @@ for o in list(scene.objects):
         bpy.data.objects.remove(o, do_unlink=True)
 
 enemy_positions = [(-1.5,2.5,0), (-.5,-3,0), (2.3,-1.3,0)]
+
+# Hide any previous boss instance if the script is re-run.
+existing_boss = bpy.data.objects.get("STAR_EATER_BOSS")
+if existing_boss:
+    existing_boss.hide_viewport = True
+    existing_boss.hide_render = True
+existing_boss_aura = bpy.data.objects.get("STAR_EATER_BOSS_AURA")
+if existing_boss_aura:
+    existing_boss_aura.hide_viewport = True
+    existing_boss_aura.hide_render = True
 
 # Find the three existing enemies.
 for i in range(1, 4):
@@ -112,7 +124,8 @@ hud = make_text("GAME_HUD", "", (0,5.0,.5), .38)
 
 def update_hud():
     if state["boss_active"]:
-        hud.data.body = f"STARFALL DASH   |   STAR EATER   |   HP {state['hp']}/{MAX_HP}   |   BOSS {state['boss_hp']}/{BOSS_HP}"
+        phase = "II" if state["boss_phase"] == 2 else "I"
+        hud.data.body = f"STARFALL DASH   |   STAR EATER PHASE {phase}   |   HP {state['hp']}/{MAX_HP}   |   BOSS {state['boss_hp']}/{BOSS_HP}"
     else:
         hud.data.body = f"STARFALL DASH   |   STAGE {state['stage']}/{STAGES}   |   HP {state['hp']}/{MAX_HP}   |   CRYSTALS {state['crystals']}/{CRYSTALS_PER_STAGE}"
 
@@ -184,6 +197,7 @@ def spawn_boss():
     state["boss_hp"]=BOSS_HP
     state["boss_last_attack"]=-99.0
     state["boss_active"]=True
+    state["boss_phase"]=1
     state["crystals"]=0
     hero.location=(-4.5,0,0)
     update_hud()
@@ -194,6 +208,8 @@ def damage_boss():
     if not state["boss_active"] or not boss or boss.hide_viewport:
         return
     state["boss_hp"]-=1
+    if state["boss_hp"] <= BOSS_HP // 2:
+        state["boss_phase"]=2
     boss.scale=(1.75,1.75,1.75)
     boss["hit_until"]=time.monotonic()+.12
     update_hud()
@@ -296,7 +312,7 @@ def reset():
             bpy.data.objects.remove(o,do_unlink=True)
     state.update({"hp":MAX_HP,"crystals":0,"stage":1,"alive":True,"won":False,"transition":False,"transition_until":0.0,
                   "last_attack":-99.0,"last_dash":-99.0,"dash_until":0.0,"dash_dir":Vector((0,0,0)),"invuln":0.0,"keys":set(),
-                  "enemies":[],"drops":[],"pulse":None,"boss":None,"boss_hp":BOSS_HP,"boss_last_attack":-99.0,"boss_active":False})
+                  "enemies":[],"drops":[],"pulse":None,"boss":None,"boss_hp":BOSS_HP,"boss_last_attack":-99.0,"boss_active":False,"boss_phase":1})
     hero.location=(-5.2,0,0)
     hero.hide_viewport=False
     hero.hide_render=False
@@ -393,11 +409,13 @@ class STARFALL_OT_PLAY(bpy.types.Operator):
                     boss=state["boss"]
                     d=Vector((hero.location.x-boss.location.x,hero.location.y-boss.location.y,0))
                     if d.length:
-                        boss.location += d.normalized()*min(BOSS_SPEED*dt,d.length)
+                        boss_speed = BOSS_PHASE2_SPEED if state["boss_phase"] == 2 else BOSS_SPEED
+                        boss.location += d.normalized()*min(boss_speed*dt,d.length)
                     aura=bpy.data.objects.get("STAR_EATER_BOSS_AURA")
                     if aura:
                         aura.location=boss.location
-                    if dist(hero,boss)<BOSS_CONTACT_RANGE and now-state["boss_last_attack"]>=BOSS_ATTACK_COOLDOWN:
+                    boss_cooldown = BOSS_PHASE2_COOLDOWN if state["boss_phase"] == 2 else BOSS_ATTACK_COOLDOWN
+                    if dist(hero,boss)<BOSS_CONTACT_RANGE and now-state["boss_last_attack"]>=boss_cooldown:
                         state["boss_last_attack"]=now
                         damage(now)
                 collect()
