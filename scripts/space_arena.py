@@ -90,7 +90,9 @@ for i in range(14):
 # ---------- hero ----------
 hero=cube('PLAYER_CUBE',(-5.2,0,0),(0.65,0.65,0.65),CUBE,.16)
 # small glowing inner core
-core=ico('Player_Core',(-5.2,0,0),.28,CUBE2,2); core.parent=hero
+core=ico('Player_Core',(-5.2,0,0),.28,CUBE2,2)
+core.parent=hero
+core.location=(0,0,0)
 
 # ---------- enemies ----------
 for idx,loc in enumerate([(-1.5,2.5,0),(-.5,-3,0),(2.3,-1.3,0)]):
