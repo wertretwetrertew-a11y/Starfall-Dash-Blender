@@ -86,3 +86,10 @@ The prototype now treats movement and positioning as part of combat: the player 
 ### Stability notes
 
 The stage transition disables movement and combat input, resets attack/dash cooldown state for the new arena, and removes collected drops from the active drop list. This prevents repeated collection or attack effects from firing during the transition window.
+
+
+### Star Eater boss
+
+After collecting the third set of 3 crystals, the normal enemies disappear and the prototype starts a 1-on-1 Star Eater encounter. The boss has its own HP bar, follows the player at a higher speed, and damages the player only at close range. The player's existing Space attack is the only way to damage it; Dash remains the defensive tool. Defeating the boss completes the prototype run.
+
+This is intentionally a first boss prototype: the fight is melee-only and uses simple pursuit/contact pressure before adding more complex boss phases.
