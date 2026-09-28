@@ -43,11 +43,13 @@ ABILITY_RANGE = 2.25
 ABILITY_COOLDOWN = .65
 MAX_HP = 5
 DAMAGE_COOLDOWN = 1.0
-NEEDED = 3
+CRYSTALS_PER_STAGE = 3
+STAGES = 3
 BOUNDS = (-8, 8, -5.5, 5.5)
+STAGE_LAYOUTS = {1:[(-1.5,2.5,0),(-.5,-3,0),(2.3,-1.3,0)],2:[(-2.5,3.5,0),(1,3,0),(3.5,-2.5,0),(-3.5,-2,0)],3:[(-5.5,4.2,0),(-1.8,4.5,0),(2,4.3,0),(5.5,3.8,0),(0,-3.8,0)]}
 
 state = {
-    "hp": MAX_HP, "crystals": 0, "alive": True, "won": False,
+    "hp": MAX_HP, "crystals": 0, "stage": 1, "alive": True, "won": False, "transition": False, "transition_until": 0.0,
     "last_attack": -99.0, "invuln": 0.0, "keys": set(),
     "enemies": [], "drops": [], "pulse": None
 }
@@ -100,13 +102,37 @@ def make_text(name, body, loc, size):
 hud = make_text("GAME_HUD", "", (0,5.0,.5), .38)
 
 def update_hud():
-    hud.data.body = f"STARFALL DASH   |   HP {state['hp']}/{MAX_HP}   |   CORE CRYSTALS {state['crystals']}/{NEEDED}"
+    hud.data.body = f"STARFALL DASH   |   STAGE {state['stage']}/{STAGES}   |   HP {state['hp']}/{MAX_HP}   |   CRYSTALS {state['crystals']}/{CRYSTALS_PER_STAGE}"
 
 def message(body):
     for name in ("GAME_MESSAGE","GAME_OVER","GAME_WIN"):
         o=bpy.data.objects.get(name)
         if o: bpy.data.objects.remove(o,do_unlink=True)
     return make_text("GAME_MESSAGE",body,(0,0,.6),.65)
+
+def spawn_stage():
+    for e in list(state["enemies"]):
+        e.hide_viewport = True
+        e.hide_render = True
+    state["enemies"].clear()
+    for c in list(state["drops"]):
+        aura=bpy.data.objects.get(c.name+"_AURA")
+        if c.name in scene.objects: bpy.data.objects.remove(c, do_unlink=True)
+        if aura: bpy.data.objects.remove(aura, do_unlink=True)
+    state["drops"].clear()
+    state["crystals"]=0
+    for i,loc in enumerate(STAGE_LAYOUTS[state["stage"]],1):
+        e=bpy.data.objects.get(f"Enemy_{i}")
+        if not e:
+            bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=2,radius=.62,location=loc)
+            e=bpy.context.object
+            e.name=f"Enemy_{i}"
+            m=bpy.data.materials.get("Enemy")
+            if m: e.data.materials.append(m)
+        e.location=loc
+        e.hide_viewport=False
+        e.hide_render=False
+    update_hud()
 
 def kill_enemy(enemy):
     if enemy not in state["enemies"]:
@@ -159,15 +185,21 @@ def collect():
                 aura.hide_viewport=True
                 aura.hide_render=True
             update_hud()
-            if state["crystals"]>=NEEDED:
-                state["won"]=True
-                message("CORE FRAGMENT RECOVERED   —   YOU WIN!")
+            if state["crystals"]>=CRYSTALS_PER_STAGE:
+                if state["stage"] < STAGES:
+                    state["transition"] = True
+                    state["transition_until"] = time.monotonic() + 1.2
+                    state["stage"] += 1
+                    message("STAGE COMPLETE   —   NEXT STAGE")
+                else:
+                    state["won"] = True
+                    message("COSMIC CORE RESTORED   —   YOU WIN!")
 
 def reset():
     for o in list(scene.objects):
         if o.name.startswith(("DROP_CRYSTAL_","GAME_MESSAGE","GAME_OVER","GAME_WIN","ABILITY_")):
             bpy.data.objects.remove(o,do_unlink=True)
-    state.update({"hp":MAX_HP,"crystals":0,"alive":True,"won":False,
+    state.update({"hp":MAX_HP,"crystals":0,"stage":1,"alive":True,"won":False,"transition":False,"transition_until":0.0,
                   "last_attack":-99.0,"invuln":0.0,"keys":set(),
                   "enemies":[],"drops":[],"pulse":None})
     hero.location=(-5.2,0,0)
@@ -211,14 +243,20 @@ class STARFALL_OT_PLAY(bpy.types.Operator):
             elif event.value=="RELEASE": state["keys"].discard(k)
         if event.type=="SPACE" and event.value=="PRESS":
             attack(now)
-        if event.type=="R" and event.value=="PRESS" and not state["alive"]:
+        if event.type=="R" and event.value=="PRESS" and (not state["alive"] or state["won"]):
             reset()
 
         if event.type=="TIMER":
             dt=min(max(now-self.last,0),.05)
             self.last=now
 
-            if state["alive"] and not state["won"]:
+            if state["transition"] and now >= state["transition_until"]:
+                state["transition"] = False
+                hero.location=(-5.2,0,0)
+                spawn_stage()
+                message("NEW STAGE — COLLECT 3 CRYSTALS")
+
+            if state["alive"] and not state["won"] and not state["transition"]:
                 d=Vector((0,0,0))
                 if "UP" in state["keys"]: d.y+=1
                 if "DOWN" in state["keys"]: d.y-=1
@@ -282,8 +320,8 @@ print("=== STARFALL DASH PLAYABLE PROTOTYPE ===")
 print("WASD / Arrows = move")
 print("SPACE = close-range attack")
 print("Kill enemies -> collect their dropped crystals")
-print("3 crystals = WIN")
+print("3 crystals per stage; 3 stages = WIN")
 print("Enemy contact = damage")
-print("R = restart after death")
+print("R = restart after death or victory")
 print("ESC = stop")
 print("========================================")
