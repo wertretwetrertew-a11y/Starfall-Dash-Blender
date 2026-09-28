@@ -156,6 +156,18 @@ def spawn_stage():
             e.name=f"Enemy_{i}"
             m=bpy.data.materials.get("Enemy")
             if m: e.data.materials.append(m)
+        # Three readable melee roles: normal, fast/fragile, heavy/slow.
+        role = "normal" if i % 3 == 1 else ("fast" if i % 3 == 2 else "heavy")
+        e["role"] = role
+        if role == "fast":
+            e["speed"] = 1.65 + (state["stage"] - 1) * .18
+            e.scale = (.72,.72,.72)
+        elif role == "heavy":
+            e["speed"] = .82 + (state["stage"] - 1) * .12
+            e.scale = (1.28,1.28,1.28)
+        else:
+            e["speed"] = 1.15 + (state["stage"] - 1) * .28
+            e.scale = (1,1,1)
         e.location=loc
         e.hide_viewport=False
         e.hide_render=False
@@ -400,8 +412,8 @@ class STARFALL_OT_PLAY(bpy.types.Operator):
                 hero.location.x=max(BOUNDS[0],min(BOUNDS[1],hero.location.x))
                 hero.location.y=max(BOUNDS[2],min(BOUNDS[3],hero.location.y))
 
-                enemy_speed = 1.15 + (state["stage"] - 1) * 0.28
                 for e in list(state["enemies"]):
+                    enemy_speed = e.get("speed", 1.15 + (state["stage"] - 1) * 0.28)
                     d=Vector((hero.location.x-e.location.x,hero.location.y-e.location.y,0))
                     if d.length:
                         e.location += d.normalized()*min(enemy_speed*dt,d.length)
@@ -493,6 +505,7 @@ print("SPACE = close-range attack")
 print("LEFT SHIFT = dash / brief invulnerability")
 print("Kill enemies -> collect their dropped crystals")
 print("3 crystals per stage; after stage 3, face the Star Eater boss")
+print("Enemy roles: normal / fast / heavy; all attacks are melee")
 print("Enemy contact = damage; boss is a close-range duel")
 print("R = restart after death or victory")
 print("ESC = stop")
