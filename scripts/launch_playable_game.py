@@ -1,18 +1,18 @@
 # Starfall Dash — One-click Blender prototype launcher
-# Run this script from Blender's Scripting workspace.
-# It builds the arena, installs gameplay, saves the .blend, and starts the prototype.
+# Open this file together with the other scripts in Blender's Text Editor and Run Script.
+# This version executes the scripts from Blender Text datablocks, so it does not depend
+# on the current working directory or an already-saved .blend path.
 
 import bpy
 
-BASE = bpy.path.abspath("//")
+def run_text(name):
+    text = bpy.data.texts.get(name)
+    if not text:
+        raise RuntimeError("Missing Blender Text datablock: " + name)
+    source = text.as_string()
+    exec(compile(source, name, "exec"), {"__file__": name, "__name__": "__main__"})
 
-def run_script(path):
-    with open(path, "r", encoding="utf-8") as f:
-        source = f.read()
-    exec(compile(source, path, "exec"), {"__file__": path, "__name__": "__main__"})
-
-run_script(BASE + "scripts/space_arena.py")
-run_script(BASE + "scripts/playable_space_arena_v2.py")
-
+run_text("space_arena.py")
+run_text("playable_space_arena_v2.py")
 bpy.ops.starfall.play_v2()
 print("Starfall Dash playable prototype launched.")
